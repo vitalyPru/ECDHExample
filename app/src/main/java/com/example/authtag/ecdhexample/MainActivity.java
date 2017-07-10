@@ -7,14 +7,37 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
 
+import org.spongycastle.asn1.x9.X9ECParameters;
 import org.spongycastle.crypto.Digest;
 import org.spongycastle.crypto.digests.SHA256Digest;
 import org.spongycastle.crypto.generators.HKDFBytesGenerator;
+import org.spongycastle.crypto.params.AsymmetricKeyParameter;
+import org.spongycastle.crypto.params.ECDomainParameters;
+import org.spongycastle.crypto.params.ECPublicKeyParameters;
 import org.spongycastle.crypto.params.HKDFParameters;
+import org.spongycastle.crypto.util.PublicKeyFactory;
+import org.spongycastle.jce.ECNamedCurveTable;
+import org.spongycastle.jce.ECPointUtil;
+import org.spongycastle.jce.interfaces.ECPublicKey;
+import org.spongycastle.jce.provider.BouncyCastleProvider;
+import org.spongycastle.jce.spec.ECNamedCurveParameterSpec;
+import org.spongycastle.jce.spec.ECNamedCurveSpec;
 import org.spongycastle.util.encoders.Hex;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.spec.ECPoint;
+import java.security.spec.ECPublicKeySpec;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Enumeration;
 
 import de.frank_durr.ecdh_curve25519.ECDHCurve25519;
 
@@ -92,6 +115,67 @@ public class MainActivity extends AppCompatActivity {
                    "Tag's public key: \n" + Hex.toHexString(tag_public_key) + "\n" +
                    "Shared secret: \n" + Hex.toHexString(shared_secret) + "\n" +
                    "Unlock Code: \n" + Hex.toHexString(unlock_code) + "\n"  );
+
+
+
+        byte[] pubKey = Hex.decode("04779dd197a5df977ed2cf6cb31d82d43328b790dc6b3b7d4437a427bd5847dfcde94b724a555b6d017bb7607c3e3281daf5b1699d6ef4124975c9237b917d426f");
+        byte[] message = new byte[0];
+        try {
+            message = "Maarten Bodewes generated this test vector on 2016-11-08".getBytes("ASCII");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        byte[] signature = Hex.decode("30440220241097efbf8b63bf145c8961dbdf10c310efbb3b2676bbc0f8b08505c9e2f7950220021006b7838609339e8b415a7f9acb1b661828131aef1ecbc7955dfb01f3ca0e");
+
+        Enumeration curves = ECNamedCurveTable.getNames();
+        while (curves.hasMoreElements()) {
+            Log.d(TAG, "U " + curves.nextElement()  );
+        }
+
+        ECNamedCurveParameterSpec spec = ECNamedCurveTable.getParameterSpec("secp256k1");
+        KeyFactory kf = null;
+        try {
+            kf = KeyFactory.getInstance("ECDSA",new BouncyCastleProvider());
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+        ECNamedCurveSpec params = new ECNamedCurveSpec("secp256k1", spec.getCurve(), spec.getG(), spec.getN());
+        ECPoint point =  ECPointUtil.decodePoint(params.getCurve(), pubKey);
+        ECPublicKeySpec pubKeySpec = new ECPublicKeySpec(point, params);
+        ECPublicKey pk = null;
+        try {
+            pk = (ECPublicKey) kf.generatePublic(pubKeySpec);
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }
+
+        Signature ecdsaVerify = null;
+        try {
+            ecdsaVerify = Signature.getInstance("SHA256withECDSA", new BouncyCastleProvider());
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        try {
+            ecdsaVerify.initVerify(pk);
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+        try {
+            ecdsaVerify.update(message);
+        } catch (SignatureException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Boolean verified = ecdsaVerify.verify(signature);
+            tw.setText( tw.getText() + "Signature verified: " + verified.toString() + "\n" );
+        } catch (SignatureException e) {
+            e.printStackTrace();
+        }
+
+
+
     }
 
     @Override
