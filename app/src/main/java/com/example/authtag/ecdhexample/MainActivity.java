@@ -117,22 +117,29 @@ public class MainActivity extends AppCompatActivity {
                    "Unlock Code: \n" + Hex.toHexString(unlock_code) + "\n"  );
 
 
+        /**********************************************************
+         * Authorization service challenge signature verification *
+        ***********************************************************/
 
-        byte[] pubKey = Hex.decode("04779dd197a5df977ed2cf6cb31d82d43328b790dc6b3b7d4437a427bd5847dfcde94b724a555b6d017bb7607c3e3281daf5b1699d6ef4124975c9237b917d426f");
-        byte[] message = new byte[0];
-        try {
-            message = "Maarten Bodewes generated this test vector on 2016-11-08".getBytes("ASCII");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        byte[] signature = Hex.decode("30440220241097efbf8b63bf145c8961dbdf10c310efbb3b2676bbc0f8b08505c9e2f7950220021006b7838609339e8b415a7f9acb1b661828131aef1ecbc7955dfb01f3ca0e");
+        /* Tag Authentication service public key from tag (64 bytes)*/
+        String pubKeyFromTag = "779dd197a5df977ed2cf6cb31d82d43328b790dc6b3b7d4437a427bd5847dfcde94b724a555b6d017bb7607c3e3281daf5b1699d6ef4124975c9237b917d426f";
 
-        Enumeration curves = ECNamedCurveTable.getNames();
-        while (curves.hasMoreElements()) {
-            Log.d(TAG, "U " + curves.nextElement()  );
-        }
+        /* ASN.1 representaitoin of public key*/
+        byte[] pubKey = Hex.decode("04" + pubKeyFromTag);
 
-        ECNamedCurveParameterSpec spec = ECNamedCurveTable.getParameterSpec("secp256k1");
+        /* Challenge, writed to tag (32 bytes) */
+        byte[] message = Hex.decode("4b688df40bcedbe641ddb16ff0a1842d9c67ea1c3bf63f3e0471baa664531d1a");
+
+        /* Signature from tag.  */
+        /* R part - first 32 bytes */
+        String r_part_of_sig = "241097efbf8b63bf145c8961dbdf10c310efbb3b2676bbc0f8b08505c9e2f795";
+        /* S part - last 32 bytes */
+        String s_part_of_sig = "021006b7838609339e8b415a7f9acb1b661828131aef1ecbc7955dfb01f3ca0e";
+
+        /* ASN.1 representaitoin of signature*/
+        byte[] signature = Hex.decode("30440220"+ r_part_of_sig + "0220" + s_part_of_sig);
+
+        /* Set secp256k1 curve */
         KeyFactory kf = null;
         try {
             kf = KeyFactory.getInstance("ECDSA",new BouncyCastleProvider());
@@ -140,7 +147,10 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
+        ECNamedCurveParameterSpec spec = ECNamedCurveTable.getParameterSpec("secp256k1");
         ECNamedCurveSpec params = new ECNamedCurveSpec("secp256k1", spec.getCurve(), spec.getG(), spec.getN());
+
+        /* Create ECPublicKey from tag data */
         ECPoint point =  ECPointUtil.decodePoint(params.getCurve(), pubKey);
         ECPublicKeySpec pubKeySpec = new ECPublicKeySpec(point, params);
         ECPublicKey pk = null;
@@ -150,9 +160,11 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
+        /* Prepare signature verification with public key */
         Signature ecdsaVerify = null;
         try {
-            ecdsaVerify = Signature.getInstance("SHA256withECDSA", new BouncyCastleProvider());
+
+            ecdsaVerify = Signature.getInstance( "NONEwithECDSA", new BouncyCastleProvider());
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
@@ -161,12 +173,15 @@ public class MainActivity extends AppCompatActivity {
         } catch (InvalidKeyException e) {
             e.printStackTrace();
         }
+
+        /* verification for the challenge */
         try {
             ecdsaVerify.update(message);
         } catch (SignatureException e) {
             e.printStackTrace();
         }
 
+        /* verify signature */
         try {
             Boolean verified = ecdsaVerify.verify(signature);
             tw.setText( tw.getText() + "Signature verified: " + verified.toString() + "\n" );
